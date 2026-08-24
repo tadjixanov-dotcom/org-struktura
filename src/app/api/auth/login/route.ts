@@ -1,10 +1,19 @@
 import { createSession, verifyCredentials } from "@/lib/auth";
 import { fail, ok } from "@/lib/api";
+import { clientIp, rateLimit } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
+  const gate = rateLimit(`login:${clientIp(req)}`, 8, 60_000);
+  if (!gate.ok) {
+    return fail(
+      `Juda ko'p urinish. ${gate.retryAfter} soniyadan keyin qayta urinib ko'ring.`,
+      429
+    );
+  }
+
   let body: { username?: string; password?: string };
   try {
     body = await req.json();
