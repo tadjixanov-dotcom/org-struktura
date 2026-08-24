@@ -34,11 +34,26 @@ function matchCase(source: string, converted: string): string {
   return allUpper ? converted.toUpperCase() : converted[0].toUpperCase() + converted.slice(1);
 }
 
+/** Lotin yozuvida qoladigan qisqartmalar va xalqaro atamalar. */
+const KEEP_LATIN = new Set([
+  "PDF", "PNG", "JPG", "JPEG", "SVG", "CSV", "XLS", "XLSX", "DOC", "DOCX",
+  "KPI", "CRM", "ERP", "SMM", "SEO", "HR", "IT", "API", "URL", "SMS", "QR",
+  "CEO", "CTO", "CFO", "COO", "OKR", "ROI", "B2B", "B2C", "VIP", "ID",
+  "HTTP", "HTTPS", "WWW", "EMAIL", "E-MAIL", "OK", "SQL", "AI",
+]);
+
+const WORD_RE = /[\p{L}\p{N}][\p{L}\p{N}'ʻʼ‘’`-]*/gu;
+
 export function toCyrillic(input: string): string {
   if (!input) return input;
+  return input.replace(WORD_RE, (word) =>
+    KEEP_LATIN.has(word.toUpperCase()) ? word : cyrillicWord(word)
+  );
+}
+
+function cyrillicWord(s: string): string {
   let out = "";
   let i = 0;
-  const s = input;
 
   while (i < s.length) {
     const rest = s.slice(i);
@@ -102,9 +117,16 @@ const C2L: Record<string, string> = {
 
 export function toLatin(input: string): string {
   if (!input) return input;
+  return input.replace(WORD_RE, (word) => latinWord(word));
+}
+
+function latinWord(s: string): string {
+  // "БОШҚАРУВ" kabi bosh harfli so'zlar lotinda ham bosh harfda qolsin
+  const allUpper = s.length > 1 && s === s.toUpperCase() && s !== s.toLowerCase();
   let out = "";
-  for (let i = 0; i < input.length; i++) {
-    const ch = input[i];
+
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
     const low = ch.toLowerCase();
     const mapped = C2L[low];
     if (mapped === undefined) {
@@ -112,15 +134,17 @@ export function toLatin(input: string): string {
       continue;
     }
     if (mapped === "") continue;
-    // So'z boshidagi "е" -> "ye"
+
+    // So'z boshidagi va unlidan keyingi "е" -> "ye"
     let value = mapped;
     if (low === "е") {
-      const prev = i === 0 ? "" : input[i - 1];
-      const atWordStart = i === 0 || !/[\p{L}\p{N}]/u.test(prev);
-      const afterVowel = /[аеёиоуўэюяыAEIOU]/i.test(prev || "");
+      const prev = i === 0 ? "" : s[i - 1];
+      const atWordStart = i === 0;
+      const afterVowel = /[аеёиоуўэюяы]/i.test(prev || "");
       value = atWordStart || afterVowel ? "ye" : "e";
     }
-    out += matchCase(ch, value);
+
+    out += allUpper ? value.toUpperCase() : matchCase(ch, value);
   }
   return out;
 }

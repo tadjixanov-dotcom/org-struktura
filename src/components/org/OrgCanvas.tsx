@@ -236,13 +236,17 @@ function Inner({
         if (!el) return null;
 
         const bounds = getNodesBounds(rf.getNodes());
-        const pad = 60;
-        const contentW = Math.max(bounds.width + pad * 2, 640);
-        const contentH = Math.max(bounds.height + pad * 2, 420);
-        const scale = Math.min(2400 / contentW, 3);
-        const width = Math.round(contentW * Math.max(scale, 1));
-        const height = Math.round(contentH * Math.max(scale, 1));
-        const viewport = getViewportForBounds(bounds, width, height, 0.05, 4, pad);
+        const padPx = 56;
+        const contentW = Math.max(bounds.width + padPx * 2, 720);
+        const contentH = Math.max(bounds.height + padPx * 2, 460);
+
+        // Chop etishda o'qilarli bo'lishi uchun kattalashtiramiz, ammo 4200px dan oshirmaymiz
+        const scale = Math.min(2.5, Math.max(1, 4200 / Math.max(contentW, contentH)));
+        const width = Math.round(contentW * scale);
+        const height = Math.round(contentH * scale);
+
+        // getViewportForBounds'da padding — nisbat (0.04 = 4%), piksel emas
+        const viewport = getViewportForBounds(bounds, width, height, 0.05, 4, 0.04);
 
         const isDark =
           document.documentElement.getAttribute("data-theme") === "dark" ||

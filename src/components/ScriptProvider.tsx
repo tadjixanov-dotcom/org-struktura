@@ -59,10 +59,8 @@ export function ScriptProvider({ children }: { children: React.ReactNode }) {
     else document.documentElement.setAttribute("data-theme", t);
   }, []);
 
-  const t = useCallback(
-    (text: string | null | undefined) => (script === "latn" ? text ?? "" : convert(text, script)),
-    [script]
-  );
+  // Matn kirill yoki lotinda kiritilgan bo'lishi mumkin — har doim tanlangan yozuvga o'giramiz
+  const t = useCallback((text: string | null | undefined) => convert(text, script), [script]);
 
   const value = useMemo<Ctx>(
     () => ({ script, setScript, t, theme, setTheme, mounted }),
