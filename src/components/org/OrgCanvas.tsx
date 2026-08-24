@@ -72,6 +72,29 @@ function Inner({
   const { t } = useScript();
   const rf = useReactFlow();
   const nodesInitialized = useNodesInitialized();
+  const [dark, setDark] = useState(false);
+
+  // Chiziq rangi CSS o'zgaruvchisi orqali emas, to'g'ridan-to'g'ri beriladi:
+  // aks holda PNG/PDF eksportida SVG chiziqlar butunlay yo'qoladi.
+  useEffect(() => {
+    const read = () => {
+      const attr = document.documentElement.getAttribute("data-theme");
+      setDark(
+        attr === "dark" ||
+          (attr !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches)
+      );
+    };
+    read();
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    mq.addEventListener("change", read);
+    const observer = new MutationObserver(read);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => {
+      mq.removeEventListener("change", read);
+      observer.disconnect();
+    };
+  }, []);
+  const edgeStroke = dark ? "#5c5c63" : "#b4b4ba";
   const [rfNodes, setRfNodes, onNodesChange] = useNodesState<PositionFlowNode>([]);
   const [rfEdges, setRfEdges] = useEdgesState<Edge>([]);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
@@ -167,6 +190,7 @@ function Inner({
             type: "smoothstep",
             pathOptions: { borderRadius: 10 } as never,
             animated: false,
+            style: { stroke: edgeStroke, strokeWidth: 1.6 },
           };
         })
     );
@@ -179,6 +203,7 @@ function Inner({
     depthOf,
     childCounts,
     onAddChild,
+    edgeStroke,
     setRfNodes,
     setRfEdges,
   ]);

@@ -130,6 +130,16 @@ export function downloadDataUrl(dataUrl: string, filename: string) {
   a.remove();
 }
 
+const UZ_MONTHS = [
+  "yanvar", "fevral", "mart", "aprel", "may", "iyun",
+  "iyul", "avgust", "sentabr", "oktabr", "noyabr", "dekabr",
+];
+
+/** 24-avgust, 2026 */
+export function uzDate(d: Date = new Date()): string {
+  return `${d.getDate()}-${UZ_MONTHS[d.getMonth()]}, ${d.getFullYear()}`;
+}
+
 export function safeFilename(input: string): string {
   return (
     input

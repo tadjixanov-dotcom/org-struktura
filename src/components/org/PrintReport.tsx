@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ScriptToggle } from "@/components/Toggles";
 import { useScript } from "@/components/ScriptProvider";
 import { buildTree, flatten, pathToRoot, statistics } from "@/lib/tree";
+import { uzDate } from "@/lib/pdf";
 import type { OrgNode, OrgTreeNode, Project } from "@/lib/types";
 
 const SECTIONS: {
@@ -93,11 +94,7 @@ export function PrintReport({
     return () => window.clearTimeout(id);
   }, [autoPrint, printed, nodes.length]);
 
-  const today = new Date().toLocaleDateString("uz-UZ", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  });
+  const today = uzDate();
 
   return (
     <div style={{ background: "#f5f5f7", minHeight: "100dvh" }}>

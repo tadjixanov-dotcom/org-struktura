@@ -243,7 +243,8 @@ body {
   background: var(--accent);
 }
 .react-flow__node:hover .react-flow__handle { opacity: 1; }
-.react-flow__edge-path { stroke: var(--separator-strong); stroke-width: 1.75; }
+/* Chiziq rangi komponentda inline beriladi (eksport uchun muhim) */
+.react-flow__edge-path { stroke-width: 1.6; }
 .react-flow__edge.selected .react-flow__edge-path,
 .react-flow__edge:hover .react-flow__edge-path { stroke: var(--accent); }
 .react-flow__controls-button {

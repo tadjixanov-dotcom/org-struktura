@@ -5,7 +5,14 @@ import { ChevronDown, Download, FileText, Image as ImageIcon, Loader2, Printer }
 import type { CanvasApi } from "./OrgCanvas";
 import type { Project } from "@/lib/types";
 import { useScript } from "@/components/ScriptProvider";
-import { composeSheet, downloadDataUrl, downloadPdf, safeFilename, type PageFormat } from "@/lib/pdf";
+import {
+  composeSheet,
+  downloadDataUrl,
+  downloadPdf,
+  safeFilename,
+  uzDate,
+  type PageFormat,
+} from "@/lib/pdf";
 import { convert } from "@/lib/translit";
 
 export function ExportMenu({
@@ -44,11 +51,7 @@ export function ExportMenu({
     if (!api) return null;
     const chart = await api.toPng();
     if (!chart) return null;
-    const stamp = new Date().toLocaleDateString("uz-UZ", {
-      day: "2-digit",
-      month: "long",
-      year: "numeric",
-    });
+    const stamp = uzDate();
     return composeSheet(chart, {
       title: convert(project.companyName || project.name, script),
       subtitle: [convert(project.name, script), `${nodeCount} ${t("lavozim")}`]
