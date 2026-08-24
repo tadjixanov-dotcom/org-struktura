@@ -1,7 +1,7 @@
 import type { OrgNode, OrgTreeNode } from "./types";
 
 export const NODE_W = 268;
-export const NODE_H = 132;
+export const NODE_H = 116;
 
 /** Yassi ro'yxatdan daraxt quradi. Halqalar (cycle) xavfsiz uziladi. */
 export function buildTree(nodes: OrgNode[]): OrgTreeNode[] {

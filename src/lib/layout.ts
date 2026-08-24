@@ -5,11 +5,11 @@ export type Positions = Record<string, { x: number; y: number }>;
 
 /* Joylashuv o'lchamlari */
 const H_GAP = 44; // qo'shni shoxlar orasidagi gorizontal masofa
-const V_GAP = 86; // bosqichlar orasidagi vertikal masofa
+const V_GAP = 78; // bosqichlar orasidagi vertikal masofa
 const COL_INDENT = 56; // ustun rejimida bo'ysunuvchilarni chapdan surish
 // (ulash chizig'i rahbar kartochkasining chap yelkasidan tushib, shu bo'sh yo'lakda ketadi)
-const COL_VGAP = 18; // ustunda qo'shnilar orasidagi masofa
-const COL_TOP = 46; // rahbardan birinchi bo'ysunuvchigacha
+const COL_VGAP = 16; // ustunda qo'shnilar orasidagi masofa
+const COL_TOP = 40; // rahbardan birinchi bo'ysunuvchigacha
 const ROOT_GAP = 96; // bir nechta ildiz orasidagi masofa
 const MARGIN = 48;
 
