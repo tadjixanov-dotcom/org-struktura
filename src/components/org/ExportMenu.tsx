@@ -87,8 +87,8 @@ export function ExportMenu({
   }
 
   const items = [
-    { key: "a4", label: "Sxema — PDF (A4)", Icon: Download, run: () => handlePdf("a4") },
-    { key: "a3", label: "Sxema — PDF (A3, kattaroq)", Icon: Download, run: () => handlePdf("a3") },
+    { key: "a4", label: "Sxema — PDF, A4 (1 varaq)", Icon: Download, run: () => handlePdf("a4") },
+    { key: "a3", label: "Sxema — PDF, A3 (1 varaq, yirikroq)", Icon: Download, run: () => handlePdf("a3") },
     { key: "png", label: "Sxema — PNG rasm", Icon: ImageIcon, run: handlePng },
   ];
 

@@ -32,6 +32,8 @@ function PositionNodeInner({ data, selected }: NodeProps<PositionFlowNode>) {
   const { t } = useScript();
   const { node, childCount, depth, editable, dimmed, dropTarget } = data;
   const accent = node.accent || LEVEL_TONE[depth % LEVEL_TONE.length];
+  const title = t(node.title);
+  const hasPerson = Boolean(node.personName || node.photoUrl);
 
   return (
     <div
@@ -63,34 +65,42 @@ function PositionNodeInner({ data, selected }: NodeProps<PositionFlowNode>) {
       >
         <div style={{ height: 3, background: accent }} />
 
-        <div className="flex items-start gap-3 px-3.5 pb-3 pt-3">
-          <div
-            className="flex shrink-0 items-center justify-center overflow-hidden rounded-full text-[13px] font-bold"
-            style={{
-              width: 42,
-              height: 42,
-              background: `${accent}1a`,
-              color: accent,
-              border: `1px solid ${accent}33`,
-            }}
-          >
-            {node.photoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={node.photoUrl} alt="" className="h-full w-full object-cover" />
-            ) : (
-              initials(node.personName, node.title)
-            )}
-          </div>
+        <div className="flex items-start gap-2.5 px-3.5 pb-2 pt-2.5">
+          {hasPerson ? (
+            <div
+              className="flex shrink-0 items-center justify-center overflow-hidden rounded-full text-[13px] font-bold"
+              style={{
+                width: 40,
+                height: 40,
+                background: `${accent}1a`,
+                color: accent,
+                border: `1px solid ${accent}33`,
+              }}
+            >
+              {node.photoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={node.photoUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                initials(node.personName, node.title)
+              )}
+            </div>
+          ) : null}
 
           <div className="min-w-0 flex-1">
             <div
-              className="truncate text-[14.5px] font-semibold leading-tight"
-              style={{ color: "var(--text)", letterSpacing: "-0.015em" }}
-              title={t(node.title)}
+              className={hasPerson ? "line-clamp-2" : "line-clamp-3"}
+              style={{
+                color: "var(--text)",
+                letterSpacing: "-0.014em",
+                fontWeight: 600,
+                fontSize: title.length > 58 ? 12 : title.length > 38 ? 13 : 14.5,
+                lineHeight: 1.24,
+              }}
+              title={title}
             >
-              {t(node.title)}
+              {title}
             </div>
-            {node.personName ? (
+            {hasPerson ? (
               <div
                 className="mt-0.5 truncate text-[12.5px]"
                 style={{ color: "var(--text-secondary)" }}
@@ -98,11 +108,7 @@ function PositionNodeInner({ data, selected }: NodeProps<PositionFlowNode>) {
               >
                 {t(node.personName)}
               </div>
-            ) : (
-              <div className="mt-0.5 truncate text-[12.5px] italic" style={{ color: "var(--text-tertiary)" }}>
-                {t("vakant")}
-              </div>
-            )}
+            ) : null}
           </div>
         </div>
 
