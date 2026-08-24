@@ -20,19 +20,12 @@ const MARGIN = 48;
  */
 const COLUMN_FROM_DEPTH = 2;
 
-/** Yakka (bo'ysunuvchisi yo'q) lavozimlar shuncha va undan ko'p bo'lsa, bitta ustunga yig'iladi. */
-const STACK_THRESHOLD = 3;
-
 type Plan = {
   id: string;
   w: number;
   h: number;
   mode: "leaf" | "row" | "col";
   kids: Plan[];
-  /** row rejimida bitta vertikal ustunga yig'ilgan yakka lavozimlar */
-  stack: Plan[];
-  /** row rejimida joylashtiriladigan slotlar: shoxlar + (kerak bo'lsa) yig'ma ustun */
-  slots: { plan: Plan | null; w: number; h: number }[];
 };
 
 function measure(
@@ -41,7 +34,7 @@ function measure(
   depth: number,
   guard: Set<string>
 ): Plan {
-  const base: Plan = { id: node.id, w: NODE_W, h: NODE_H, mode: "leaf", kids: [], stack: [], slots: [] };
+  const base: Plan = { id: node.id, w: NODE_W, h: NODE_H, mode: "leaf", kids: [] };
   if (guard.has(node.id)) return base;
   guard.add(node.id);
 
@@ -57,33 +50,16 @@ function measure(
     return { ...base, mode: "col", kids, w, h };
   }
 
-  // Gorizontal rejim: shoxlar yonma-yon, yakka lavozimlar bitta ustunga
-  const branches = kids.filter((k) => k.mode !== "leaf");
-  const leaves = kids.filter((k) => k.mode === "leaf");
-
-  const slots: Plan["slots"] = branches.map((p) => ({ plan: p, w: p.w, h: p.h }));
-  let stack: Plan[] = [];
-
-  if (leaves.length >= STACK_THRESHOLD) {
-    stack = leaves;
-    slots.push({
-      plan: null,
-      w: NODE_W,
-      h: leaves.length * NODE_H + COL_VGAP * (leaves.length - 1),
-    });
-  } else {
-    for (const l of leaves) slots.push({ plan: l, w: l.w, h: l.h });
-  }
-
-  const childrenW = slots.reduce((s, sl) => s + sl.w, 0) + H_GAP * (slots.length - 1);
+  // Gorizontal rejim: barcha bo'ysunuvchilar yonma-yon.
+  // Ular bir xil y'da turgani uchun ulash chiziqlari faqat bosqichlar orasidagi
+  // bo'sh yo'lakda ketadi va hech qachon kartochka ustidan o'tmaydi.
+  const childrenW = kids.reduce((s, k) => s + k.w, 0) + H_GAP * (kids.length - 1);
   return {
     ...base,
     mode: "row",
     kids,
-    stack,
-    slots,
     w: Math.max(NODE_W, childrenW),
-    h: NODE_H + V_GAP + Math.max(...slots.map((s) => s.h)),
+    h: NODE_H + V_GAP + Math.max(...kids.map((k) => k.h)),
   };
 }
 
@@ -104,23 +80,14 @@ function place(plan: Plan, x: number, y: number, out: Positions) {
   }
 
   // row
-  const childrenW =
-    plan.slots.reduce((s, sl) => s + sl.w, 0) + H_GAP * (plan.slots.length - 1);
+  const childrenW = plan.kids.reduce((s, k) => s + k.w, 0) + H_GAP * (plan.kids.length - 1);
   out[plan.id] = { x: Math.round(x + (plan.w - NODE_W) / 2), y: Math.round(y) };
 
   let cx = x + (plan.w - childrenW) / 2;
   const cy = y + NODE_H + V_GAP;
-  for (const slot of plan.slots) {
-    if (slot.plan) {
-      place(slot.plan, cx, cy, out);
-    } else {
-      let sy = cy;
-      for (const leaf of plan.stack) {
-        out[leaf.id] = { x: Math.round(cx), y: Math.round(sy) };
-        sy += NODE_H + COL_VGAP;
-      }
-    }
-    cx += slot.w + H_GAP;
+  for (const kid of plan.kids) {
+    place(kid, cx, cy, out);
+    cx += kid.w + H_GAP;
   }
 }
 

@@ -11,6 +11,7 @@ import {
   getNodesBounds,
   getViewportForBounds,
   useEdgesState,
+  useNodesInitialized,
   useNodesState,
   useReactFlow,
   type Edge,
@@ -70,6 +71,7 @@ function Inner({
 }: Props) {
   const { t } = useScript();
   const rf = useReactFlow();
+  const nodesInitialized = useNodesInitialized();
   const [rfNodes, setRfNodes, onNodesChange] = useNodesState<PositionFlowNode>([]);
   const [rfEdges, setRfEdges] = useEdgesState<Edge>([]);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
@@ -150,7 +152,9 @@ function Inner({
           const parent = byId.get(n.parentId!)!;
           const column = isColumnGroup.get(n.parentId!) ?? false;
           const below = n.y > parent.y + NODE_H * 0.4;
-          const sideAttached = below && (column || n.x >= parent.x + NODE_W);
+          // Faqat vertikal ustunda turgan bo'ysunuvchilar chapdan ulanadi.
+          // Gorizontal qatordagilar doimo yuqoridan — shunda chiziqlar bir xil turadi.
+          const sideAttached = below && column;
           // Chiziq rahbarning chap yelkasidan tushadi — faqat bo'ysunuvchi
           // rahbar kartochkasi kengligi ichida joylashgan bo'lsa
           const fromShoulder = sideAttached && n.x >= parent.x && n.x < parent.x + NODE_W;
@@ -179,15 +183,15 @@ function Inner({
     setRfEdges,
   ]);
 
-  // Birinchi yuklanishda ko'rinishga moslash
+  // Birinchi yuklanishda ko'rinishga moslash — tugunlar o'lchangandan keyin
   useEffect(() => {
-    if (didFit.current || nodes.length === 0) return;
+    if (didFit.current || !nodesInitialized || rfNodes.length === 0) return;
     didFit.current = true;
     const id = window.setTimeout(() => {
-      rf.fitView({ padding: 0.18, duration: 420, maxZoom: 1 });
-    }, 60);
+      rf.fitView({ padding: 0.12, duration: 420, maxZoom: 1, minZoom: 0.05 });
+    }, 40);
     return () => window.clearTimeout(id);
-  }, [nodes.length, rf]);
+  }, [nodesInitialized, rfNodes.length, rf]);
 
   /* ---------- Tortib qo'yish orqali bo'ysundirish ---------- */
 
@@ -204,10 +208,20 @@ function Inner({
     (draggedId: string, x: number, y: number) => {
       const cx = x + NODE_W / 2;
       const cy = y + NODE_H / 2;
+      // Tasodifan bo'ysundirib qo'ymaslik uchun kartochkaning faqat markaziy
+      // qismiga tushirilgandagina rahbar almashadi (chetlari xavfsiz zona).
+      const insetX = NODE_W * 0.22;
+      const insetY = NODE_H * 0.22;
       const banned = forbidden(draggedId);
       for (const n of nodes) {
         if (banned.has(n.id)) continue;
-        if (cx >= n.x && cx <= n.x + NODE_W && cy >= n.y && cy <= n.y + NODE_H) return n.id;
+        if (
+          cx >= n.x + insetX &&
+          cx <= n.x + NODE_W - insetX &&
+          cy >= n.y + insetY &&
+          cy <= n.y + NODE_H - insetY
+        )
+          return n.id;
       }
       return null;
     },
