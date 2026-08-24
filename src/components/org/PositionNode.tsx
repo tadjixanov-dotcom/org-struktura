@@ -45,7 +45,9 @@ function PositionNodeInner({ data, selected }: NodeProps<PositionFlowNode>) {
         transition: "opacity 220ms ease, transform 180ms cubic-bezier(0.32,0.72,0,1)",
       }}
     >
-      <Handle type="target" position={Position.Top} style={{ top: -5 }} />
+      {/* Yuqoridan — gorizontal qatorda, chapdan — vertikal ustunda ulanadi */}
+      <Handle id="top" type="target" position={Position.Top} style={{ top: -5 }} />
+      <Handle id="left" type="target" position={Position.Left} style={{ left: -5 }} />
 
       <div
         className="relative flex h-full flex-col overflow-hidden"
@@ -150,7 +152,14 @@ function PositionNodeInner({ data, selected }: NodeProps<PositionFlowNode>) {
         </button>
       ) : null}
 
-      <Handle type="source" position={Position.Bottom} style={{ bottom: -5 }} />
+      <Handle id="bottom" type="source" position={Position.Bottom} style={{ bottom: -5 }} />
+      {/* Ustunli joylashuvda chiziq kartochkaning chap yelkasidan tushadi */}
+      <Handle
+        id="bottomLeft"
+        type="source"
+        position={Position.Bottom}
+        style={{ bottom: -5, left: 26, transform: "translateX(-50%)" }}
+      />
     </div>
   );
 }

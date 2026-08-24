@@ -120,18 +120,51 @@ function Inner({
       }))
     );
 
-    const ids = new Set(nodes.map((n) => n.id));
+    const byId = new Map(nodes.map((n) => [n.id, n]));
+
+    // Bir rahbarning bo'ysunuvchilari vertikal ustunda turibdimi yoki gorizontal qatorda —
+    // shunga qarab ulash chizig'i "qavs" (chapdan) yoki "daraxt" (yuqoridan) bo'ladi.
+    const kidsOf = new Map<string, OrgNode[]>();
+    for (const n of nodes) {
+      if (!n.parentId || !byId.has(n.parentId)) continue;
+      const list = kidsOf.get(n.parentId) ?? [];
+      list.push(n);
+      kidsOf.set(n.parentId, list);
+    }
+    const isColumnGroup = new Map<string, boolean>();
+    for (const [pid, kids] of kidsOf) {
+      const parent = byId.get(pid)!;
+      if (kids.length === 1) {
+        isColumnGroup.set(pid, kids[0].x > parent.x + 16 && kids[0].x < parent.x + NODE_W);
+        continue;
+      }
+      const xs = kids.map((k) => k.x);
+      const ys = kids.map((k) => k.y);
+      isColumnGroup.set(pid, Math.max(...ys) - Math.min(...ys) > Math.max(...xs) - Math.min(...xs));
+    }
+
     setRfEdges(
       nodes
-        .filter((n) => n.parentId && ids.has(n.parentId))
-        .map<Edge>((n) => ({
-          id: `${n.parentId}->${n.id}`,
-          source: n.parentId!,
-          target: n.id,
-          type: "smoothstep",
-          pathOptions: { borderRadius: 18 } as never,
-          animated: false,
-        }))
+        .filter((n) => n.parentId && byId.has(n.parentId))
+        .map<Edge>((n) => {
+          const parent = byId.get(n.parentId!)!;
+          const column = isColumnGroup.get(n.parentId!) ?? false;
+          const below = n.y > parent.y + NODE_H * 0.4;
+          const sideAttached = below && (column || n.x >= parent.x + NODE_W);
+          // Chiziq rahbarning chap yelkasidan tushadi — faqat bo'ysunuvchi
+          // rahbar kartochkasi kengligi ichida joylashgan bo'lsa
+          const fromShoulder = sideAttached && n.x >= parent.x && n.x < parent.x + NODE_W;
+          return {
+            id: `${n.parentId}->${n.id}`,
+            source: n.parentId!,
+            target: n.id,
+            sourceHandle: fromShoulder ? "bottomLeft" : "bottom",
+            targetHandle: sideAttached ? "left" : "top",
+            type: "smoothstep",
+            pathOptions: { borderRadius: 10 } as never,
+            animated: false,
+          };
+        })
     );
   }, [
     nodes,
