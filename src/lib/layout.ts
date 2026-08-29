@@ -14,11 +14,14 @@ const ROOT_GAP = 96; // bir nechta ildiz orasidagi masofa
 const MARGIN = 48;
 
 /**
- * Ustun rejimi shu chuqurlikdan boshlanadi: yuqori bo'g'inlar (rahbariyat)
- * gorizontal qatorda, bo'limlar esa rahbar ostida vertikal ro'yxat bo'lib turadi —
- * bu klassik org-chart ko'rinishi va sxemani keskin ixchamlashtiradi.
+ * Ustun rejimi qaysi chuqurlikdan boshlanishini tuzilmaning o'zidan aniqlaymiz:
+ * ko'p (>=5) bo'ysunuvchili birinchi bo'g'in — "keng" bosqich (direktor/rektor qatori);
+ * undan bitta pastdagi bosqichdan boshlab bo'limlar vertikal ustunga teriladi.
+ * Shu tufayli Kuzatuv kengashi kabi qo'shimcha yuqori bo'g'inlar qo'shilsa ham,
+ * sxema klassik org-chart ko'rinishini saqlaydi.
  */
-const COLUMN_FROM_DEPTH = 2;
+const WIDE_CHILDREN = 5;
+const DEFAULT_COLUMN_FROM = 2;
 
 type Plan = {
   id: string;
@@ -32,7 +35,8 @@ function measure(
   node: OrgNode,
   childrenOf: Map<string, OrgNode[]>,
   depth: number,
-  guard: Set<string>
+  guard: Set<string>,
+  columnFrom: number
 ): Plan {
   const base: Plan = { id: node.id, w: NODE_W, h: NODE_H, mode: "leaf", kids: [] };
   if (guard.has(node.id)) return base;
@@ -41,9 +45,9 @@ function measure(
   const children = childrenOf.get(node.id) ?? [];
   if (children.length === 0) return base;
 
-  const kids = children.map((c) => measure(c, childrenOf, depth + 1, guard));
+  const kids = children.map((c) => measure(c, childrenOf, depth + 1, guard, columnFrom));
 
-  if (depth >= COLUMN_FROM_DEPTH) {
+  if (depth >= columnFrom) {
     const w = Math.max(NODE_W, COL_INDENT + Math.max(...kids.map((k) => k.w)));
     const h =
       NODE_H + COL_TOP + kids.reduce((s, k) => s + k.h, 0) + COL_VGAP * (kids.length - 1);
@@ -118,12 +122,32 @@ export function autoLayout(nodes: OrgNode[], _direction: "TB" | "LR" = "TB"): Po
   }
   roots.sort((a, b) => a.sortOrder - b.sortOrder);
 
+  // "Keng" bosqichni topamiz: >=WIDE_CHILDREN bo'ysunuvchili eng yuqori bo'g'in
+  const depthOf = new Map<string, number>();
+  {
+    const stack: [OrgNode, number][] = roots.map((r) => [r, 0]);
+    while (stack.length) {
+      const [n, d] = stack.pop()!;
+      if (depthOf.has(n.id)) continue;
+      depthOf.set(n.id, d);
+      for (const c of childrenOf.get(n.id) ?? []) stack.push([c, d + 1]);
+    }
+  }
+  let wideDepth = Infinity;
+  for (const [id, kids] of childrenOf) {
+    if (kids.length >= WIDE_CHILDREN) {
+      wideDepth = Math.min(wideDepth, depthOf.get(id) ?? Infinity);
+    }
+  }
+  const columnFrom =
+    wideDepth === Infinity ? DEFAULT_COLUMN_FROM : Math.max(1, wideDepth + 1);
+
   const guard = new Set<string>();
-  const plans = roots.map((r) => measure(r, childrenOf, 0, guard));
+  const plans = roots.map((r) => measure(r, childrenOf, 0, guard, columnFrom));
 
   // Halqa tufayli chetda qolgan tugunlar bo'lsa, ularni ham ildiz sifatida qo'shamiz
   for (const n of nodes) {
-    if (!guard.has(n.id)) plans.push(measure(n, childrenOf, 0, guard));
+    if (!guard.has(n.id)) plans.push(measure(n, childrenOf, 0, guard, columnFrom));
   }
 
   const out: Positions = {};

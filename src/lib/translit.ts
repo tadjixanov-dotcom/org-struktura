@@ -40,6 +40,7 @@ const KEEP_LATIN = new Set([
   "KPI", "CRM", "ERP", "SMM", "SEO", "HR", "IT", "API", "URL", "SMS", "QR",
   "CEO", "CTO", "CFO", "COO", "OKR", "ROI", "B2B", "B2C", "VIP", "ID",
   "HTTP", "HTTPS", "WWW", "EMAIL", "E-MAIL", "OK", "SQL", "AI",
+  "ECTS", "HEMIS", "GPA", "NIU", "QUANTUM", "1C", "ADESK",
 ]);
 
 const WORD_RE = /[\p{L}\p{N}][\p{L}\p{N}'ʻʼ‘’`-]*/gu;
