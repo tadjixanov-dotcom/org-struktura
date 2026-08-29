@@ -20,6 +20,7 @@ import {
   Settings,
   Sparkles,
   Trash2,
+  Undo2,
   Users,
   X,
 } from "lucide-react";
@@ -34,6 +35,25 @@ import type { OrgNode, OrgTreeNode, Project } from "@/lib/types";
 
 const ACCENTS = ["#0071e3", "#5e5ce6", "#30b0c7", "#34c759", "#ff9f0a", "#ff375f", "#1d1d1f"];
 type SaveState = "idle" | "saving" | "saved" | "error";
+
+/* ---------------- Undo (orqaga qaytarish) ---------------- */
+
+type UndoEntry =
+  | {
+      kind: "patch";
+      nodeId: string;
+      before: Partial<OrgNode>;
+      label: string;
+      fieldsKey: string;
+      stamp: number;
+    }
+  | { kind: "create"; nodeId: string; label: string }
+  | { kind: "delete"; node: OrgNode; childIds: string[]; label: string }
+  | { kind: "positions"; before: Record<string, { x: number; y: number }>; label: string };
+
+const UNDO_LIMIT = 40;
+/** Shu oraliqda bir xil maydonga ketma-ket yozish bitta amal hisoblanadi. */
+const COALESCE_MS = 1200;
 
 export function Builder({
   project: initialProject,
@@ -59,6 +79,50 @@ export function Builder({
 
   const pending = useRef(new Map<string, Record<string, unknown>>());
   const timer = useRef<number | null>(null);
+
+  // Undo: har bir amaldan oldingi holat stekka yoziladi
+  const undoStack = useRef<UndoEntry[]>([]);
+  const [undoCount, setUndoCount] = useState(0);
+  const [undoBusy, setUndoBusy] = useState(false);
+  const nodesRef = useRef(nodes);
+  useEffect(() => {
+    nodesRef.current = nodes;
+  }, [nodes]);
+
+  const pushUndo = useCallback((entry: UndoEntry) => {
+    const stack = undoStack.current;
+    const top = stack[stack.length - 1];
+    // Matn terish paytida har bir harf alohida amal bo'lib ketmasligi uchun
+    if (
+      entry.kind === "patch" &&
+      top?.kind === "patch" &&
+      top.nodeId === entry.nodeId &&
+      top.fieldsKey === entry.fieldsKey &&
+      entry.stamp - top.stamp < COALESCE_MS
+    ) {
+      top.stamp = entry.stamp; // dastlabki "before" saqlanib qoladi
+      return;
+    }
+    stack.push(entry);
+    if (stack.length > UNDO_LIMIT) stack.shift();
+    setUndoCount(stack.length);
+  }, []);
+
+  /** O'chirib qayta yaratilgan tugunning eski id'sini stekdagi yozuvlarda yangilaydi. */
+  const remapUndoIds = useCallback((oldId: string, newId: string) => {
+    for (const e of undoStack.current) {
+      if (e.kind === "patch" && e.nodeId === oldId) e.nodeId = newId;
+      if (e.kind === "create" && e.nodeId === oldId) e.nodeId = newId;
+      if (e.kind === "delete") {
+        e.childIds = e.childIds.map((c) => (c === oldId ? newId : c));
+        if (e.node.parentId === oldId) e.node = { ...e.node, parentId: newId };
+      }
+      if (e.kind === "positions" && e.before[oldId]) {
+        e.before[newId] = e.before[oldId];
+        delete e.before[oldId];
+      }
+    }
+  }, []);
 
   const selected = useMemo(() => nodes.find((n) => n.id === selectedId) ?? null, [nodes, selectedId]);
   const stats = useMemo(() => statistics(nodes), [nodes]);
@@ -124,12 +188,34 @@ export function Builder({
   }, [flush]);
 
   const patchNode = useCallback(
-    (id: string, patch: Partial<OrgNode>, immediate = false) => {
+    (id: string, patch: Partial<OrgNode>, immediate = false, record = true) => {
+      if (record) {
+        const current = nodesRef.current.find((n) => n.id === id);
+        if (current) {
+          const keys = Object.keys(patch).sort();
+          const before: Partial<OrgNode> = {};
+          for (const k of keys) (before as Record<string, unknown>)[k] = current[k as keyof OrgNode];
+          const label =
+            "parentId" in patch
+              ? "Boʻysunish oʻzgarishi"
+              : "x" in patch || "y" in patch
+                ? "Koʻchirish"
+                : "Tahrir";
+          pushUndo({
+            kind: "patch",
+            nodeId: id,
+            before,
+            label,
+            fieldsKey: keys.join(","),
+            stamp: Date.now(),
+          });
+        }
+      }
       setNodes((prev) => prev.map((n) => (n.id === id ? { ...n, ...patch } : n)));
       pending.current.set(id, { ...(pending.current.get(id) ?? {}), ...patch });
       schedule(immediate);
     },
-    [schedule]
+    [schedule, pushUndo]
   );
 
   /* ---------------- Amallar ---------------- */
@@ -152,17 +238,20 @@ export function Builder({
         const created: OrgNode = await res.json();
         setNodes((prev) => [...prev, created]);
         setSelectedId(created.id);
+        pushUndo({ kind: "create", nodeId: created.id, label: "Yangi lavozim" });
         setSaveState("saved");
         window.setTimeout(() => setSaveState((s) => (s === "saved" ? "idle" : s)), 1500);
       } catch {
         setSaveState("error");
       }
     },
-    [nodes, project.id]
+    [nodes, project.id, pushUndo]
   );
 
   const deleteNode = useCallback(async () => {
     if (!selectedId) return;
+    const snapshot = nodesRef.current.find((n) => n.id === selectedId);
+    const childIds = nodesRef.current.filter((n) => n.parentId === selectedId).map((n) => n.id);
     setSaveState("saving");
     try {
       const res = await fetch(`/api/nodes/${selectedId}?mode=promote`, { method: "DELETE" });
@@ -170,6 +259,7 @@ export function Builder({
       if (!res.ok) throw new Error();
       setNodes(data.nodes ?? []);
       setSelectedId(null);
+      if (snapshot) pushUndo({ kind: "delete", node: snapshot, childIds, label: "Oʻchirish" });
       setSaveState("saved");
       window.setTimeout(() => setSaveState((s) => (s === "saved" ? "idle" : s)), 1500);
     } catch {
@@ -177,7 +267,7 @@ export function Builder({
     } finally {
       setDeleteOpen(false);
     }
-  }, [selectedId]);
+  }, [selectedId, pushUndo]);
 
   const reparent = useCallback(
     (childId: string, parentId: string | null) => {
@@ -188,6 +278,7 @@ export function Builder({
 
   const autoArrange = useCallback(async () => {
     setLayouting(true);
+    const before = Object.fromEntries(nodesRef.current.map((n) => [n.id, { x: n.x, y: n.y }]));
     try {
       await flush();
       const res = await fetch(`/api/projects/${project.id}/layout`, {
@@ -198,12 +289,110 @@ export function Builder({
       if (res.ok) {
         const fresh: OrgNode[] = await res.json();
         setNodes(fresh);
+        pushUndo({ kind: "positions", before, label: "Avto joylashuv" });
         window.setTimeout(() => api?.fitView(), 90);
       }
     } finally {
       setLayouting(false);
     }
-  }, [project.id, api, flush]);
+  }, [project.id, api, flush, pushUndo]);
+
+  /* ---------------- Orqaga qaytarish ---------------- */
+
+  const undo = useCallback(async () => {
+    const entry = undoStack.current.pop();
+    setUndoCount(undoStack.current.length);
+    if (!entry || undoBusy) return;
+    setUndoBusy(true);
+    setSaveState("saving");
+    try {
+      if (entry.kind === "patch") {
+        patchNode(entry.nodeId, entry.before, true, false);
+      } else if (entry.kind === "create") {
+        // Yangi qo'shilgan lavozimni o'chiramiz
+        const res = await fetch(`/api/nodes/${entry.nodeId}?mode=promote`, { method: "DELETE" });
+        const data = await res.json();
+        if (!res.ok) throw new Error();
+        setNodes(data.nodes ?? []);
+        setSelectedId((cur) => (cur === entry.nodeId ? null : cur));
+      } else if (entry.kind === "delete") {
+        // O'chirilgan lavozimni barcha maydonlari bilan qayta tiklaymiz
+        const n = entry.node;
+        const res = await fetch(`/api/projects/${project.id}/nodes`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: n.title,
+            parentId: n.parentId,
+            personName: n.personName,
+            department: n.department,
+            email: n.email,
+            phone: n.phone,
+            photoUrl: n.photoUrl,
+            summary: n.summary,
+            duties: n.duties,
+            responsibilities: n.responsibilities,
+            authorities: n.authorities,
+            kpis: n.kpis,
+            requirements: n.requirements,
+            accent: n.accent,
+            x: n.x,
+            y: n.y,
+          }),
+        });
+        if (!res.ok) throw new Error();
+        const created: OrgNode = await res.json();
+        await fetch(`/api/nodes/${created.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sortOrder: n.sortOrder }),
+        });
+        // Yuqoriga ko'tarilgan bo'ysunuvchilarni qaytaramiz
+        for (const childId of entry.childIds) {
+          await fetch(`/api/nodes/${childId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ parentId: created.id }),
+          });
+        }
+        remapUndoIds(n.id, created.id);
+        const freshRes = await fetch(`/api/projects/${project.id}/nodes`);
+        if (freshRes.ok) setNodes(await freshRes.json());
+        setSelectedId(created.id);
+      } else if (entry.kind === "positions") {
+        const res = await fetch(`/api/projects/${project.id}/positions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ positions: entry.before }),
+        });
+        if (!res.ok) throw new Error();
+        setNodes((prev) =>
+          prev.map((n) => (entry.before[n.id] ? { ...n, ...entry.before[n.id] } : n))
+        );
+      }
+      setSaveState("saved");
+      window.setTimeout(() => setSaveState((s) => (s === "saved" ? "idle" : s)), 1500);
+    } catch (err) {
+      console.error("undo", err);
+      setSaveState("error");
+    } finally {
+      setUndoBusy(false);
+    }
+  }, [undoBusy, patchNode, project.id, remapUndoIds]);
+
+  // Ctrl+Z / Cmd+Z (matn maydonlarida brauzerning o'z undo'si ishlaydi)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.key.toLowerCase() !== "z") return;
+      const el = document.activeElement as HTMLElement | null;
+      const tag = el?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select" || el?.isContentEditable) return;
+      e.preventDefault();
+      undo();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [undo]);
 
   const saveProject = useCallback(
     async (patch: Partial<Project>) => {
@@ -302,6 +491,22 @@ export function Builder({
               className="field !w-[210px] !rounded-full !py-2 !pl-9 text-[13.5px]"
             />
           </div>
+
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm shrink-0"
+            onClick={undo}
+            disabled={undoBusy || undoCount === 0}
+            title={
+              undoCount > 0
+                ? `${t("Orqaga qaytarish")}: ${t(undoStack.current[undoStack.current.length - 1]?.label ?? "")} (Ctrl+Z)`
+                : t("Qaytaradigan amal yoʻq")
+            }
+            aria-label={t("Orqaga qaytarish")}
+          >
+            {undoBusy ? <Loader2 size={14} className="animate-spin" /> : <Undo2 size={14} strokeWidth={2.3} />}
+            <span className="hidden lg:inline">{t("Orqaga")}</span>
+          </button>
 
           <button
             type="button"
