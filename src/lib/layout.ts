@@ -47,7 +47,13 @@ function measure(
 
   const kids = children.map((c) => measure(c, childrenOf, depth + 1, guard, columnFrom));
 
-  if (depth >= columnFrom) {
+  // "Keng" tugun: bo'ysunuvchilari ko'p va aksariyati o'z bo'ysunuvchilariga ega
+  // bo'lsa (masalan, REKTOR ijrochi direktor ostida tursa ham), qator rejimida chiziladi.
+  const branchy = kids.filter((k) => k.mode !== "leaf").length;
+  const wideBranchy =
+    kids.length >= WIDE_CHILDREN && branchy >= 3 && branchy * 2 >= kids.length;
+
+  if (depth >= columnFrom && !wideBranchy) {
     const w = Math.max(NODE_W, COL_INDENT + Math.max(...kids.map((k) => k.w)));
     const h =
       NODE_H + COL_TOP + kids.reduce((s, k) => s + k.h, 0) + COL_VGAP * (kids.length - 1);
