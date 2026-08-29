@@ -39,15 +39,18 @@ function PositionNodeInner({ data, selected }: NodeProps<PositionFlowNode>) {
     <div
       className="group relative"
       style={{
+        // Aniq balandlik: ulash nuqtalari kartochka chetiga to'g'ri tushishi uchun
+        // o'rovchi blok va kartochka bir xil o'lchamda bo'lishi shart.
         width: NODE_W,
-        minHeight: NODE_H,
+        height: NODE_H,
         opacity: dimmed ? 0.34 : 1,
         transition: "opacity 220ms ease, transform 180ms cubic-bezier(0.32,0.72,0,1)",
       }}
     >
-      {/* Yuqoridan — gorizontal qatorda, chapdan — vertikal ustunda ulanadi */}
-      <Handle id="top" type="target" position={Position.Top} style={{ top: -5 }} />
-      <Handle id="left" type="target" position={Position.Left} style={{ left: -5 }} />
+      {/* Yuqoridan — gorizontal qatorda, chapdan — vertikal ustunda ulanadi.
+          Nuqtalar aynan kartochka chegarasida: chiziq bo'shliqsiz kirib turadi. */}
+      <Handle id="top" type="target" position={Position.Top} style={{ top: 0 }} />
+      <Handle id="left" type="target" position={Position.Left} style={{ left: 0 }} />
 
       <div
         className="relative flex h-full flex-col overflow-hidden"
@@ -67,7 +70,8 @@ function PositionNodeInner({ data, selected }: NodeProps<PositionFlowNode>) {
       >
         <div style={{ height: 3, background: accent }} />
 
-        <div className="flex items-start gap-2.5 px-3.5 pb-2 pt-2.5">
+        {/* Matn kartochka ichida vertikal markazda turadi */}
+        <div className="flex flex-1 items-center gap-2.5 px-3.5 pb-1.5 pt-1.5">
           {hasPerson ? (
             <div
               className="flex shrink-0 items-center justify-center overflow-hidden rounded-full text-[13px] font-bold"
@@ -114,7 +118,8 @@ function PositionNodeInner({ data, selected }: NodeProps<PositionFlowNode>) {
           </div>
         </div>
 
-        <div className="mt-auto flex items-center gap-2 px-3.5 pb-3">
+        {node.department || childCount > 0 ? (
+        <div className="flex shrink-0 items-center gap-2 px-3.5 pb-2.5">
           {node.department ? (
             <span
               className="truncate rounded-full px-2 py-[3px] text-[11px] font-medium"
@@ -134,6 +139,7 @@ function PositionNodeInner({ data, selected }: NodeProps<PositionFlowNode>) {
             </span>
           ) : null}
         </div>
+        ) : null}
       </div>
 
       {editable ? (
@@ -152,13 +158,13 @@ function PositionNodeInner({ data, selected }: NodeProps<PositionFlowNode>) {
         </button>
       ) : null}
 
-      <Handle id="bottom" type="source" position={Position.Bottom} style={{ bottom: -5 }} />
+      <Handle id="bottom" type="source" position={Position.Bottom} style={{ bottom: 0 }} />
       {/* Ustunli joylashuvda chiziq kartochkaning chap yelkasidan tushadi */}
       <Handle
         id="bottomLeft"
         type="source"
         position={Position.Bottom}
-        style={{ bottom: -5, left: 26, transform: "translateX(-50%)" }}
+        style={{ bottom: 0, left: 26, transform: "translateX(-50%)" }}
       />
     </div>
   );
